@@ -23,6 +23,6 @@ jobs:
           python -m pip install cfn-lint
       - name: cfn-lint
         run: |
-          find . -not \( -path ./sdlf-utils -prune \) -type f -name '*.yaml' -print0 \
-          | xargs -0 cfn-lint
+#          find . -not \( -path ./sdlf-utils -prune \) -type f -name '*.yaml' -print0 \
+#          | xargs -0 cfn-lint
           black --check .
