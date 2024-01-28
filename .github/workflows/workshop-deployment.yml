@@ -25,3 +25,23 @@ jobs:
         with:
           name: sdlf-workshop-deployment
           template: https://sdlf-os-public-artifacts.s3-us-west-2.amazonaws.com/v2/deploying-foundations/template.yaml
+  check-build-status:
+    runs-on: ubuntu-latest
+    needs: initial-setup
+    steps:
+      - name: Install AWS CLI
+        run: |
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+          unzip -u awscliv2.zip
+          sudo ./aws/install --update
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-role
+      - name: Get CodeBuild build status
+        run: |
+          project=$(aws cloudformation describe-stacks --region eu-west-1 --stack-name sdlf-workshop-deployment --query "Stacks[0].Outputs[?OutputKey=='oWorkshopProject'].OutputValue" --output text)
+          build_id=$(aws codebuild list-builds-for-project --region eu-west-1 --project-name "$project" --query "ids[0]" --output text)
+          build_status=$(aws codebuild batch-get-builds --region eu-west-1 --id "$build_id" --query builds[0].buildStatus --output text)
+          while [ "$build_status" == "IN_PROGRESS" ]; do echo "build is in progress..."; sleep 30; build_status=$(aws codebuild batch-get-builds --region eu-west-1 --id "$build_id" --query builds[0].buildStatus --output text); done
