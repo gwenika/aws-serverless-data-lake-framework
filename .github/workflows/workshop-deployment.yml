@@ -130,3 +130,23 @@ jobs:
           git add .
           git commit --allow-empty -m "Creating the legislators dataset"
           git push origin dev -f
+  check-deployment-status:
+    runs-on: ubuntu-latest
+    needs: deploy-pipeline-dataset
+    steps:
+      - name: Install AWS CLI
+        run: |
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+          unzip -u awscliv2.zip
+          sudo ./aws/install --update
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-role
+      - name: Get deployment status
+        run: |
+          cicd_teams=$(aws codepipeline --region ${{ env.AWS_REGION }} list-pipelines --query "pipelines[?starts_with(name, 'sdlf-cicd-teams-datalake-dev-engineering-rTeamCodePipeline')].name" --output text)
+          teams_status=$(aws codepipeline --region ${{ env.AWS_REGION }} list-pipeline-executions --pipeline-name $cicd_teams --query "pipelineExecutionSummaries[0].status" --output text)
+          while [ "$teams_status" == "InProgress" ]; do echo "pipeline in progress..."; sleep 30; teams_status=$(aws codepipeline --region ${{ env.AWS_REGION }} list-pipeline-executions --pipeline-name $cicd_teams --query "pipelineExecutionSummaries[0].status" --output text); done
+          if [[ "$teams_status" == "Succeeded" ]]; then echo "SDLF deployment successful!"; fi
